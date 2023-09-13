@@ -1,6 +1,5 @@
 from plugin import Plugin
 from pyglui import ui
-
 from glfw import *
 
 from pyglui.ui import get_opensans_font_path
@@ -8,12 +7,11 @@ from pyglui.pyfontstash import fontstash
 from pyglui.cygl.utils import draw_polyline, draw_points, draw_x, RGBA
 
 import zmq
-# from msgpack import loads
+
 import torch
-from torch import hub # Hub contains other models like FasterRCNNmodel
+from torch import hub 
 import numpy
 
-# import time
 import msgpack
 import math
 import base64
@@ -22,7 +20,7 @@ from numpy import asarray
 from time import time,sleep
 import cv2
 
-
+# import pretrained model of yolov5 with torch hub
 model = torch.hub.load('ultralytics/yolov5', 'yolov5m')  
 device = 'cpu'
 model.to(device)
@@ -37,6 +35,7 @@ class Module3_TFM(Plugin):
 
     def __init__(self, g_pool,queue_size=1,frame=None,run=False,min_duration=300):
         super().__init__(g_pool)
+        # initialize variables
         self.order=1
         self.glfont = fontstash.Context()
         self.glfont.add_font('opensans', get_opensans_font_path())
@@ -86,18 +85,19 @@ class Module3_TFM(Plugin):
                     self.y_gaze=g["gaze_point_3d"][1]
                     self.z_gaze=g["gaze_point_3d"][2]
             
+            # obtain user fixation
             if 'fixations' in events:
                 fixations = events['fixations']
 
                 for f in fixations:
                     self.index=f["id"]
                     self.timestamp=f["timestamp"]
-         
+                    # see if the fixation last at least the time threshold
                     if self.timestamp-self.last_timestamp>self.time_threshold and self.prev_index==self.index:
                         self.fixation_time=self.timestamp-self.last_timestamp
                     
                         if len(fixations)!=0:
-                            
+                            # if the fixation is greater than the time threshold apply the object detection algorithm, YOLOv5
                             detections = model(img[..., ::-1])
                             self.results=detections.xyxy[0].cpu().detach().numpy()
 
@@ -120,14 +120,17 @@ class Module3_TFM(Plugin):
             else:
                 height, width, _= self.frame.shape
 
-            
+                # obtain all the information provided by yolov5
                 final_results=self.results
                 distance_list=[]
+                # position of the bounding boxes
                 xmin=final_results[:,0]
                 ymin=final_results[:,1]
                 xmax=final_results[:,2]
                 ymax=final_results[:,3]
+                # condifence of the object detected
                 confidence=final_results[:,4]
+                # name of the class detected
                 classnum=final_results[:,5]
                 num_box=0
                 
@@ -136,6 +139,7 @@ class Module3_TFM(Plugin):
                     
                     if confidence[i]>self.conf_thres:
                         num_box+=1
+                        # create the bounding boxes to display them in the Pupil Labs software
                         bottom_left=[xmin[i],ymax[i]]
                         bottom_right=[xmax[i],ymax[i]]
                         top_left=[xmin[i],ymin[i]]
@@ -145,26 +149,32 @@ class Module3_TFM(Plugin):
 
                         center=[(xmax[i]+xmin[i])/2.0,(ymax[i]+ymin[i])/2.0]
                         point1=[center]
+                        # draw a point in the center of the bounding box
                         draw_points(point1,size=10.0,color=RGBA(1.0,1.0,1.0,1.0),sharpness=1.0)
                         draw_polyline(vertice,thickness=3,color=RGBA(classnum[i]/self.num_labels,classnum[i]/self.num_labels,classnum[i]/self.num_labels, 1.0))
                         self.glfont.set_color_float((classnum[i]/self.num_labels,classnum[i]/self.num_labels,classnum[i]/self.num_labels, 1.0))
+                        # draw the classname of the object detected and the confidence in the bounding box 
                         self.glfont.draw_text(xmin[i],ymin[i],model.names[classnum[i].astype(int)] + " : " + confidence[i].astype(str)) # set the labels
 
-        
+                        # if the fixation is inside one or more bounding box then calculate the distance between the position
+                        # of the fixation and the center of the bounding bounding boxes and obtain a list with all the candidates
                         if xmin[i]<self.x<xmax[i]:
                             if ymin[i]<self.y<ymax[i]:
                                 dist=math.hypot(center[0]-self.x,center[1]-self.y)
                                 candidates_list.append([dist,[center[0],center[1]],(xmax[i]-xmin[i])/3.0,(ymax[i]-xmin[i])/3.0,model.names[classnum[i].astype(int)],xmin[i],xmax[i],ymin[i],ymax[i]])           
 
                 if candidates_list:
+                    # only select the candidate with the shortest distance betwen the position of the fixation and the center
                     candidates_list=sorted(candidates_list)
+                    # draw a cross in the candidate with the shortest distance
                     draw_x([candidates_list[0][1]],candidates_list[0][2],candidates_list[0][3], thickness=5, color=RGBA(0.0,0.0,0.0,1.0))
                     self.label=candidates_list[0][4]
                     self.glfont.set_color_float((0.8,1.0,0.6, 1.0))
+                    # show in the Pupil Labs software the class name of the object with the shortest distance
                     self.glfont.draw_text(20,120,'Match with: '+ candidates_list[0][4])
                    
 
-                # number of boxes detected inside our accepted confidence
+                # show number of boxes detected inside our accepted confidence
                 if num_box==0:
                         self.glfont.set_color_float((1.0,1.0,0.1, 1.0)) 
                         self.glfont.draw_text(20,80,'No object detected') 
@@ -185,6 +195,8 @@ class Module3_TFM(Plugin):
                         self.glfont.set_color_float((0.5,0.25,0.25, 1.0))
                         self.glfont.draw_text(20,80,'More than 3 objects') 
     
+           
+            # show the position of the gaze. 
             if self.x_gaze==None:
 
                 self.glfont.set_color_float((0.8,1.0,0.6, 1.0)) # set color to the text           
