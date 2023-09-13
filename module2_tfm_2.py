@@ -1,6 +1,5 @@
 import zmq
 import msgpack
-
 import numpy
 import base64
 
@@ -13,9 +12,6 @@ import math
 # import matplotlib
 
 from vpython import *
-# from visual import *
-# j
-# from matplotlib import pyplot as plt
 
 from primesense import openni2#, nite2
 from primesense import _openni2 as c_api
@@ -64,7 +60,12 @@ principal_point_xtion_y=119.5049
 # principal_point_front_y=409.71
 
 # distance in milimeters
-distance_x_xtion_front=20
+distance_x_front_xtion=10
+distance_y_front_xtion=150
+
+# distance between cameras wrt xtion
+distance_x_xtion_front=distance_x_front_xtion
+distance_y_xtion_front=distance_y_front_xtion
 distance_z_xtion_front=20
 
 toRad=2*numpy.pi/360
@@ -202,7 +203,6 @@ def apply_surf_ransac(img1,img2,number):
         # greater or equal to number of nearest neighbors in knn match (in this case, k=2)
         MIN_MATCH_COUNT=15
         if len(good)>MIN_MATCH_COUNT:
-            # print("he entrado ood points")
             src_pts = numpy.float32([ kp1[m.queryIdx].pt for m in good ]).reshape(-1,1,2)
             dst_pts = numpy.float32([ kp2[m.trainIdx].pt for m in good ]).reshape(-1,1,2)
             M, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC,5.0)
@@ -243,7 +243,7 @@ def apply_surf_ransac(img1,img2,number):
                         flags = 2)
                 img3 = cv2.drawMatches(img1,kp1,img2,kp2,good,None,**draw_params)
                 img3_final=Image.fromarray(img3)
-                # img3_final=img3_final.save(str(number)+".png")
+               
         
     else:
         matchesMask = None
@@ -251,9 +251,6 @@ def apply_surf_ransac(img1,img2,number):
         points_img1_y=[]
         points_img2_x=[]
         points_img2_y=[]
-
-    # img3_final=img3_final.save(str(number)+".png")
-    # img3_final.show()
 
     return points_img1_x,points_img1_y,points_img2_x,points_img2_y
 
@@ -267,42 +264,40 @@ def person_rotation_visualization():
     toDeg=1/toRad
 
     # initialize the view
-    
     scene.forward=vector(-1,-1,-1)
     scene.width=800
     scene.height=800
     scene.background=color.white
+
+    # create the person and the wheelchair to visualize it in VPython
     ear1=cylinder(pos=vector(-0.8,0.2,0),axis=vector(0.15,0,0),radius=0.3,color=color.white)
     ear2=cylinder(pos=vector(1,0.2,0),axis=vector(0.15,0,0),radius=0.3,color=color.white)
     eye1=cylinder(pos=vector(0.45,0.45,0.8),axis=vector(0,0,0.1),radius=0.25,color=color.white)
     eye2=cylinder(pos=vector(-0.45,0.45,0.8),axis=vector(0,0,0.1),radius=0.25,color=color.white)
     cornea1=cylinder(pos=vector(0.42,0.45,0.9),axis=vector(0,0,0.05),radius=0.15,color=color.black)
     cornea2=cylinder(pos=vector(-0.42,0.45,0.9),axis=vector(0,0,0.05),radius=0.15,color=color.black)
-    # mouth=curve(color=color.red,radius=0.05)
     v0=vertex( pos=vec(-0.4,-0.1,1.05),color=color.black )
     v1=vertex( pos=vec(-0.1,-0.3,1.05),color=color.black)
     v2=vertex( pos=vec(0.4,-0.1,1.05),color=color.black )
     mouth = triangle(vs=[v0,v1,v2])
-    # texture_path=r'C:\Users\paula\OneDrive\Escritorio\proyecto\images\wheelchair2.jpg'
-    # chair=box(pos=vector(0,-2.75,0),size=vector(3,5,0.1),texture={'file':'wheelchair2.jpg'})
     wheel1=cylinder(pos=vector(1.3,-4,0),axis=vector(0.2,0,0),radius=1.5)
     wheel2=cylinder(pos=vector(-1.3,-4,0),axis=vector(-0.2,0,0),radius=1.5)
     rect1=box(pos=vector(0,-3,0),size=vector(2.8,0.2,2),color=color.black)
     rect2=box(pos=vector(0,-1,-1),size=vector(2.8,3,0.2),color=color.black)
-    # cylinder(pos=vector(0,-0.5,0),axis=vector(0,-3,0),radius=0.4)
     body=cone(pos=vector(0,-3,0),axis=vector(0,5.5,0),radius=0.9)
     nouse=cone(pos=vector(0,0.1,1),axis=vector(0,0,0.2),color=color.white,radius=0.15)
-    # mouth.append(vector(-0.4,-0.1,1),vector(-0.2,-0.2,1),vector(0.2,-0.2,1),vector(0.4,-0.1,1))
     person_face=sphere(radius=1,opacity=1)
-    # box=pos()
 
 
+    # xtion reference axis
     sidextionRef=arrow(length=3,shaftwidth=0.2,axis=vector(-1,0,0),pos=vector(-5,3,0),color=color.red)
     upxtionRef=arrow(length=3,shaftwidth=0.2,axis=vector(0,-1,0),pos=vector(-5,3,0),color=color.green)
     frontxtionRef=arrow(length=3,shaftwidth=0.2,axis=vector(0,0,1),pos=vector(-5,3,0),color=color.blue)
+    # create the camera xtion in the scene 
     camera_xtion1=box(pos=vector(-5.5,2.7,-1),size=vector(1.5,1,0.3))
     camera_xtion2=box(pos=vector(-5.5,2.8,-0.5),size=vector(0.75,0.5,0.3))
 
+    # create the pupil labs camera axis
     xArrow=arrow(length=2,shaftwidth=0.1,axis=vector(-1,0,0),pos=vector(0,2.75,1),color=color.red)
     zArrow=arrow(length=2,shaftwidth=0.1,axis=vector(0,-1,0),pos=vector(0,2.75,1),color=color.green)
     yArrow=arrow(length=2,shaftwidth=0.1,axis=vector(0,0,1),pos=vector(0,2.75,1),color=color.blue)
@@ -310,8 +305,9 @@ def person_rotation_visualization():
     frontArrow=arrow(length=1.5,shaftwidth=0.1,axis=vector(0,0,1),pos=vector(0,2.75,1),color=color.orange)
     upArrow=arrow(length=1.5,shaftwidth=0.1,axis=vector(0,-1,0),pos=vector(0,2.75,1),color=color.magenta)
     sideArrow=arrow(length=1.5,shaftwidth=0.1,axis=vector(-1,0,0),pos=vector(0,2.75,1),color=color.purple)
-    # gazeArrow=arrow(length=5,shaftwidth=0.1,axis=vector(0,0,1),color=color.yellow)
+    # create the gaze arrow
     gazeArrow=arrow(length=2,shaftwidth=0.1,axis=vector(2,0,2),pos=vector(0,2.75,1),color=color.black)
+
     person_face=compound([person_face,ear1,ear2,eye1,eye2,cornea1,cornea2,mouth,nouse])
     person_face.pos=vector(0,2,0)
     return frontArrow,upArrow,sideArrow,person_face,frontxtionRef,upxtionRef,sidextionRef,xArrow,zArrow,yArrow,gazeArrow
@@ -320,32 +316,33 @@ def person_rotation_visualization():
 
 # main
 
+# initialize socket for data flow between the file of Pupil Labs and this file
 subscriber=initialize_socket()
+# initialize the asus xtion camera
 rgb_stream,depth_stream=initialize_xtion()
+# create the scene in VPython
 front_arrow,up_arrow,side_arrow,person_face,front_xtion_ref,up_xtion_ref,side_xtion_ref,x_Arrow,z_Arrow,y_Arrow,gaze_Arrow=person_rotation_visualization()
 
+# initialize variables
 angle_yaw_xtion=0
 angle_pitch_xtion=0
 angle_roll_xtion=0
 increment_yaw=0
 increment_pitch=0
 increment_roll=0
-
 time_vector=[]
-
 count=0
 number=0
 beta=0
 alpha=0.9
 alpha_front=0.1
 counter=0
-# text_message=text(text=str(count),pos=vector(-12,0,8),color=color.green,axis=vector(1,0,-1))
-count=0
+
 while True:
     dmap=[]
     start=time.time()
+    # obtain Xtion depth and colour image
     xtion_img1=get_image_xtion(rgb_stream)
-    # xtion_img1.save("xtion"+str(counter)+".png")
     dmap=get_all_depth_xtion(depth_stream)
     
     sys.stdout.flush()
@@ -353,13 +350,15 @@ while True:
     # #######################################################################################################################
     # # Matching XTION & FRONT
     # #######################################################################################################################
+    # obtain front image
     front_img1,x,y,z=get_image_front(subscriber)
-    # front_img1.save("front"+str(counter)+".png")
+
+    # apply SURF and matching algorithm
     points_xtion_img1_x,points_xtion_img1_y,points_front_img1_x,points_front_img1_y=apply_surf_ransac(xtion_img1,front_img1,number)
     depth_xtion=-100
 
     if len(points_xtion_img1_x)!=0 and len(points_front_img1_x)!=0:
-        
+        # obtain the mean descriptor points
         x_xtion_img1=mean(points_xtion_img1_x)
         y_xtion_img1=mean(points_xtion_img1_y)
         x_front_img1=mean(points_front_img1_x)
@@ -367,13 +366,7 @@ while True:
         depth_xtion=get_depth_xtion(depth_stream,y_xtion_img1,x_xtion_img1)
 
         counter=counter+1
-        # xtion_img1.save(str(counter)+str(counter)+".png")
-        counter=counter+1
-        # front_img1.save(str(counter)+str(counter)+".png")
-        # counter=counter+1
-        # xtion_img2.save(str(counter)+str(counter)+".png")
-        # counter=counter+1
-        # front_img2.save(str(counter)+str(counter)+".png")
+
 
     if depth_xtion>0:
         number=number+1
@@ -393,7 +386,7 @@ while True:
         angle_b=calculate_angle_displacement(x_front_img1,focal_length_front_x,principal_point_front_x)
         angle_c=90-angle_a
         distance_E=cos(numpy.deg2rad(angle_c))*depth_xtion
-        angle_d=numpy.degrees(atan2((depth_xtion*sin(numpy.deg2rad(angle_c))),(distance_x_xtion_front+distance_E)))
+        angle_d=numpy.degrees(atan2((depth_xtion*sin(numpy.deg2rad(angle_c))),(distance_x_front_xtion+distance_E)))
         angle_d=(angle_d+360)%360
         angle_yaw_xtion_front=90-angle_d-angle_b
         
@@ -407,7 +400,7 @@ while True:
         angle_e=calculate_angle_displacement(y_xtion_img1,focal_length_xtion_y,principal_point_xtion_y)
         distance_P=sin(numpy.deg2rad(angle_e))*depth_xtion
         distance_M=cos(numpy.deg2rad(angle_e))*depth_xtion
-        angle_g=numpy.degrees(atan2(distance_M,(distance_z_xtion_front+distance_P)))
+        angle_g=numpy.degrees(atan2(distance_M,(distance_y_front_xtion+distance_P)))
         angle_g=(angle_g+360)%360
         angle_f=calculate_angle_displacement(y_front_img1,focal_length_front_y,principal_point_front_y)
         angle_pitch=90-angle_f-angle_g
@@ -452,7 +445,7 @@ while True:
             R_x_pitch=[[1, 0, 0],[0, cos(pitch), -sin(pitch)],[0, sin(pitch),cos(pitch)]]
                 
             coord_wrt_R_xtion=numpy.matmul(numpy.matmul(numpy.matmul(R_z_roll,R_y_yaw),(R_x_pitch)),[x,y,z])
-            coord_wrt_T_xtion=[-distance_x_xtion_front,0,distance_z_xtion_front]
+            coord_wrt_T_xtion=[distance_x_xtion_front,distance_y_xtion_front,distance_z_xtion_front]
             
             coord_wrt_xtion_final=coord_wrt_T_xtion+coord_wrt_R_xtion
 
@@ -462,6 +455,7 @@ while True:
             print("Gaze position wrt xtion is in x: "+str(round(coord_wrt_xtion_final[0],2))+" in y: "+str(round(coord_wrt_xtion_final[1],2))+" in z: "+str(round(coord_wrt_xtion_final[2],2)))
 
 
+        # relate the head rotation angles to rotation in the tridimensional space. 
         yaw=-angle_yaw_xtion_front*toRad
         pitch=angle_pitch_xtion_front*toRad
         roll=-angle_roll*toRad
@@ -471,6 +465,7 @@ while True:
         v=cross(s,k)
         vrot=v*cos(roll)+cross(k,v)*sin(roll)
         
+        # show the head rotation in the tridimensional space in the Vpython scene
         front_arrow.axis=k
         front_arrow.length=1.5
         person_face.axis=cross(vrot,k)
@@ -481,6 +476,7 @@ while True:
         up_arrow.length=1.5
 
         if x:
+            # show gaze direction
             angle_x_y=numpy.arctan2(coord_wrt_R_xtion[1],coord_wrt_R_xtion[0])
             x_coordinate=cos(angle_x_y)*1
             y_coordinate=sin(angle_x_y)*1
