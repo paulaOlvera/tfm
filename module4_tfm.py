@@ -127,6 +127,7 @@ def _find_nearest_idx(array, value):
     except IndexError:
         return idx - 1
  
+    
 def extract_features_from_matches_binocular(bino):
         ref,pupil_right,pupil_left=bino
         y_coordinate=[]
@@ -139,8 +140,7 @@ def extract_features_from_matches_binocular(bino):
             norm_pos_rev=[norm_pos_x,norm_pos_y]
             y_coordinate.append(norm_pos_rev)
         Y=np.array(y_coordinate)
-        # Y = np.array([r["norm_pos"] for r in ref])
-        # reverse coordinate Y 
+        
 
         X_right = np.array([p["norm_pos"] for p in pupil_right])
         
@@ -149,8 +149,8 @@ def extract_features_from_matches_binocular(bino):
         
         return X, Y
 
+    # transform the future space
 def _polynomial_features(norm_xy):
-    # slice data to retain ndim
     norm_x = norm_xy[:, :1]
     norm_y = norm_xy[:, 1:]
     norm_x_squared = norm_x**2
@@ -166,7 +166,8 @@ def _polynomial_features(norm_xy):
             norm_x_squared * norm_y_squared,
         )
     )
-
+   
+    # funtion used to fit the polynomial model 
 def fit(X, Y, outlier_removal_iterations=1):
 
     X_left_polynomial = _polynomial_features(X[:,slice(0,2)])
@@ -200,6 +201,7 @@ def fit(X, Y, outlier_removal_iterations=1):
 
     logger.debug(f"Fitting. RMSE = {rmse:>7.2f}px in final iteration.")
 
+    # obtain the erorr of the dependent variables
 def _test_pixel_error(polynomial_features, Y):
     # screen size is the frame size 
     screen_size= (1280,720)
@@ -210,14 +212,16 @@ def _test_pixel_error(polynomial_features, Y):
     return errors_px, root_mean_squared_error_px
 
 def initialize_cameras():
-    # create 2D detector
+    
     
     dev_list =  uvc.device_list()
     # print("devices: ", dev_list)
-    right_eye_camera = uvc.Capture(dev_list[0]['uid'])
-    left_eye_camera = uvc.Capture(dev_list[1]['uid'])
-    front_camera = uvc.Capture(dev_list[3]['uid'])
+    # capture images from the different cameras of the eye-tracking
+    right_eye_camera = uvc.Capture(dev_list[2]['uid'])
+    left_eye_camera = uvc.Capture(dev_list[3]['uid'])
+    front_camera = uvc.Capture(dev_list[1]['uid'])
 
+    # set configuration and resoluion
     width_right=192
     height_right=192
     fps_right=30
@@ -237,12 +241,9 @@ def initialize_cameras():
         if mode_front.width==width_front and mode_front.height==height_front and mode_front.fps==fps_front:
             front_camera.frame_mode = mode_front
 
-    # print("front",front_camera.frame_mode)
-    # print("right",right_eye_camera.frame_mode)
-    # print("left",left_eye_camera.frame_mode) 
-
     return front_camera, right_eye_camera, left_eye_camera 
 
+#  normalize coordinates -> from pixels units to [0 to 1]
 def normalize(pos,size,flip_y):
     width,height=size
     x = pos[0]
@@ -260,11 +261,9 @@ def click_event(event, x, y, flags, param):
 
 if __name__ == "__main__":
 
-    # edit `path` s.t. it points to your recording
-    # path = "/home/paula/src/recordings/single_marker"
-    # path = "/home/paula/src/recordings/5_markers/3"
+    # path where the calibration file using Pupil Labs software is
     path = r'C:\Users\paula\OneDrive\Escritorio\proyecto\calibration'
-    # Read "gaze.pldata" and "gaze_timestamps.npy" data
+    # the file that we are interested is named "notify.pldata"
     get_data = load_pldata_file(path, "notify")
     # print(get_data)
     data_gaze = get_data.data
@@ -272,28 +271,28 @@ if __name__ == "__main__":
     topics = get_data.topics
 
     import pprint
-
+    # create windows to visualize the scene, left and right eye images
     cv2.namedWindow("Real-Time Image Display", cv2.WINDOW_NORMAL)
     cv2.namedWindow("Real-Time Image left eye", cv2.WINDOW_NORMAL)
     cv2.namedWindow("Real-Time Image right eye", cv2.WINDOW_NORMAL)
     
     calib_data=data_gaze[0].get("calib_data")
-    # print(calib_data["ref_list"])
-    # extract reference data
+    # extract the reference data and the pupil data of the calibration 
     ref_data=calib_data["ref_list"]
-    
-    # extract and filter pupil data
     pupil_data=calib_data["pupil_list"]
-    # print("pupil data",pupil_data)
+    
+    # filter the data whose confidence is low
     pupil_data_post=filter_pupil_list_by_confidence(pupil_data,0.9)
     frame_count=0
     
     if pupil_data and ref_data:
+        # match data 
         match_bino=match_pupil_to_ref(pupil_data_post,ref_data)
         
+        # extract the independent and dependent variables
         X,Y = extract_features_from_matches_binocular(match_bino)
         
-        
+        # fit the model
         fit(X,Y)
 
         # initialize cameras
@@ -303,23 +302,27 @@ if __name__ == "__main__":
             image_front_raw=front_cam.get_frame()
             image_front=image_front_raw.gray
             
+            # extract information of the right eye
             image_right_eye_raw=right_eye_cam.get_frame()
             timestamp_right=image_right_eye_raw.timestamp
             image_right_eye=image_right_eye_raw.gray
             result_2d_right_eye=detector.detect(image_right_eye)
             
+            # extract information of the left eye
             image_left_eye_raw=left_eye_cam.get_frame()
             timestamp_left=image_left_eye_raw.timestamp
             image_left_eye=image_left_eye_raw.gray
             result_2d_left_eye=detector.detect(image_left_eye)
 
+            # obtain image sizes of the eye cameras
             image_size_right=[image_right_eye_raw.width,image_right_eye_raw.height]
             image_size_left = [image_left_eye_raw.width,image_left_eye_raw.height]
             
+            # obtain the position of the pupils in the images in pixels to the position in normalized coordinates. 
             norm_pos_right = normalize(result_2d_right_eye["location"],image_size_right,flip_y=True)
             norm_pos_left = normalize(result_2d_left_eye["location"],image_size_left,flip_y=True)
             
-            # create eye pupil datum 
+            # transform the independent variables to have the polynomial structure
             if result_2d_left_eye["confidence"]>0.9 and result_2d_right_eye["confidence"]>0.9:
                 X_pred_right=   [norm_pos_right[0],
                                 norm_pos_right[1],
@@ -338,19 +341,15 @@ if __name__ == "__main__":
                 X_pred=np.hstack((X_pred_left,X_pred_right)).reshape(1,-1)
 
                 gaze_predicted = binocular_model.predict(X_pred).tolist()
-                # print()
-                # print()
-                # print("-------------------------------------------------------------------------------------------------------------")
-                # print("norm gaze pos in x:"+str(round(gaze_predicted[0][0],3))+"gaze pos in y:  "+str(round(gaze_predicted[0][1],3)))
-                # print()
                 
+                # obtain the gaze position in pixels
                 gaze_pos_px_x=gaze_predicted[0][0]*image_front_raw.width
                 gaze_pos_px_y=gaze_predicted[0][1]*image_front_raw.height
 
-                # print("gaze pos in px in x: "+str(round(gaze_pos_px_x))+" gaze pos in px in y : "+str(round(gaze_pos_px_y)))
+                
                 sys.stdout.flush()
                 if display_image == True:
-                    # if 0<gaze_predicted[0][0]<1 and 0<gaze_predicted[0][1]<1:   
+                     
                     
                     # Set circle parameters
                     center = (gaze_pos_px_x, gaze_pos_px_y)
