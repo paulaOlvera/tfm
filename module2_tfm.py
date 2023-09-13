@@ -1,32 +1,21 @@
 from plugin import Plugin
 from pyglui import ui
-
 from glfw import *
-
-
 from pyglui.ui import get_opensans_font_path
 from pyglui.pyfontstash import fontstash
 from pyglui.cygl.utils import draw_rounded_rect,RGBA
-
-
 import zmq
 
 import numpy
 from threading import Thread
-# import time
 import msgpack
 import math
 import base64
-
 from numpy import asarray
-# from time import time,sleep
 import cv2
 
-
 import time
-
 from PIL import Image
-
 from primesense import openni2#, nite2
 from primesense import _openni2 as c_api
 
@@ -39,6 +28,7 @@ class Module2_TFM(Plugin):
     icon_font='pupil_icons' 
 
     def __init__(self, g_pool,frame=None,run=False):
+        # initialize variables
         super().__init__(g_pool)
         self.order=1
         self.glfont = fontstash.Context()
@@ -52,7 +42,8 @@ class Module2_TFM(Plugin):
         self.x=None
         self.y=None
         self.z=None
-        
+
+        # initialize the socket as a publisher to send information to "module2_tfm_2"
         host = "127.0.0.1"
         port = "555"
         context = zmq.Context()
@@ -63,7 +54,8 @@ class Module2_TFM(Plugin):
 
     def recent_events(self,events):
         if self.run == True:
-            # count=0
+            # obtain the image frame of the scene front camera of Pupil Labs and transform it to base64 to be able to 
+            # send it through the socket
             
             if 'frame' in events:
                 frame = events['frame']
@@ -75,6 +67,8 @@ class Module2_TFM(Plugin):
                 base64_img = base64.b64encode(numpydata)
                 
                 self.count=self.count+1
+
+                # obtain the user's fixation
             if 'fixations' in events:
                 # if 'gaze' in events:
                 fixations = events['fixations']
@@ -88,7 +82,7 @@ class Module2_TFM(Plugin):
                 self.x=None
                 self.y=None
                 self.z=None
-
+            # send in a data structure, the image of the scene with the sizes and the position of the gaze. 
             custom_datum = {
             "topic": CUSTOM_TOPIC,"frame":base64_img,"height":height,"width":width,"x":self.x,"y":self.y,"z":self.z,}
 
