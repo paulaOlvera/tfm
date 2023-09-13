@@ -14,6 +14,7 @@ class Module1_TFM(Plugin):
 
     def __init__(self, g_pool,frame=None,run=False):
         super().__init__(g_pool)
+        # initialize variables
         self.order=1
         self.glfont = fontstash.Context()
         self.glfont.add_font('opensans', get_opensans_font_path())
@@ -42,6 +43,7 @@ class Module1_TFM(Plugin):
 
     def recent_events(self,events):
         if self.run == True:
+            # obtain the blinks
             if 'blinks' in events:
                 
                 blinks= events["blinks"]
@@ -81,7 +83,7 @@ class Module1_TFM(Plugin):
                     self.send_mode=self.mode
                 else:
                     self.send_mode=None
-                
+            # obtain the gaze of the user
             if 'gaze' in events:
                 gaze = events['gaze']
                 for g in gaze:
@@ -91,8 +93,9 @@ class Module1_TFM(Plugin):
                     self.z_gaze=g["gaze_point_3d"][2]
                 
                     self.confidence=g["confidence"]
-                    
-                    if self.confidence>0.95:
+                 
+                    #  transform gaze positions to control commands
+                    if self.confidence>0.95:     #  only the gaze that has a high confidence for the control is used
                         if self.x_gaze:
                             self.prev_x_gaze=self.letter_x
                             if self.x_gaze<-40:
@@ -121,7 +124,7 @@ class Module1_TFM(Plugin):
                                 self.letter_y='N'
                                 self.letter_y=self.letter_y.encode()
                             self.prev_y_gaze=self.letter_y
-                        
+                    # send these commands in a future to the wheelchair 
                     # if self.send_mode!=None:
                     #     print(self.send_mode)
                     # print(self.mode)
@@ -132,12 +135,12 @@ class Module1_TFM(Plugin):
 
     def gl_display(self):
         if self.run==True:
-
+            
             if self.z_gaze==None:
                 self.glfont.set_color_float((0.8,1.0,0.6, 1.0)) # set color to the text           
                 self.glfont.draw_text(30,200,"Processing")
             else:
-
+                #  show the mode in which the software is running and the position of the gaze. 
                 self.glfont.set_color_float((0.0,0.0,1.0, 1.0)) # set color to the text           
                 self.glfont.draw_text(30,560,"Mode:"+str(self.mode))
 
